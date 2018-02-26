@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Windows.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace NintendoSpy.Readers
@@ -17,9 +19,9 @@ namespace NintendoSpy.Readers
         public SerialControllerReader (string portName, Func <byte[], ControllerState> packetParser) 
         {
             _packetParser = packetParser;
-
             _serialMonitor = new SerialMonitor (portName);
             _serialMonitor.PacketReceived += serialMonitor_PacketReceived;
+            _serialMonitor.PacketReceivedInvoker = Dispatcher.CurrentDispatcher;
             _serialMonitor.Disconnected += serialMonitor_Disconnected;
             _serialMonitor.Start ();
         }
@@ -33,11 +35,13 @@ namespace NintendoSpy.Readers
         void serialMonitor_PacketReceived (object sender, byte[] packet)
         {
             if (ControllerStateChanged != null) {
+                packet = _serialMonitor.getLastPacket(); // Need the latest.
                 var state = _packetParser (packet);
                 if (state != null) {
                     ControllerStateChanged (this, state);
                 }
             }
+            _serialMonitor.signalPacketParsed();
         }
 
         public void Finish ()
